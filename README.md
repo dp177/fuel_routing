@@ -35,23 +35,23 @@ A technical walkthrough demonstrating the architecture, spatial R-tree corridor 
 graph TD
     Client["Client / Browser / API Consumer"] -->|POST /api/v1/route/fuel-plan/| View["RouteFuelPlanView (DRF)"]
     
-    subgraph Routing & Geocoding Layer
+    subgraph "Routing & Geocoding Layer"
         View -->|1. Resolve Query| Geo["LocationService (Nominatim)"]
         Geo -->|Check Contiguous US| Bounds["Geographic Boundary Filter"]
         View -->|2. Compute Route| Router["OsrmRoutingService (OSRM)"]
         Router -->|MD5 Hash Check| RouteCache[("Local Cache Layer")]
     end
     
-    subgraph Geospatial Indexing Layer
+    subgraph "Geospatial Indexing Layer"
         View -->|3. Route Polyline| Spatial["FuelStationSpatialService"]
         Spatial -->|Degree Buffered Polyline| STRtree[("In-Memory STRtree 2D R-Tree")]
         STRtree -->|Candidate Stations| Chunks["Chunked Envelope Pruning (64-pt)"]
         Chunks -->|Project Candidates| Ordered["Ordered Corridor Candidates (Monotonic Miles)"]
     end
     
-    subgraph Fuel Optimization Engine
-        Ordered -->|4. Corridor Candidates| Optimizer["FuelOptimizer"]
-        Optimizer -->|Collapse Stations <= 0.5 mi| Dedupe["Cluster Collapsing (Cheapest Price)"]
+    subgraph "Fuel Optimization Engine"
+        Ordered -->|4. Corridor Candidates| OptimizerEngine["FuelOptimizer"]
+        OptimizerEngine -->|Collapse Stations <= 0.5 mi| Dedupe["Cluster Collapsing (Cheapest Price)"]
         Dedupe -->|Verify Gaps <= 500 mi| Reachability{"Feasible Route?"}
         Reachability -- No --> Err422["HTTP 422: NO_FEASIBLE_FUEL_PLAN"]
         Reachability -- Yes --> Lookahead["Greedy Lookahead Purchase Policy"]
@@ -72,7 +72,7 @@ sequenceDiagram
     participant Geo as LocationService
     participant OSRM as OsrmRoutingService
     participant Spatial as SpatialService (STRtree)
-    participant Opt as FuelOptimizer
+    participant Optimizer as FuelOptimizer
 
     User->>API: POST /api/v1/route/fuel-plan/ {start, finish}
     API->>Geo: resolve_location(start), resolve_location(finish)
@@ -83,9 +83,9 @@ sequenceDiagram
     API->>Spatial: find_candidates_near_route(geometry, 5.0 mi)
     Note over Spatial: STRtree query + 64-vertex chunk pruning (< 1.4s)
     Spatial-->>API: List[FuelStationCandidate] (Monotonically sorted)
-    API->>Opt: optimize(total_distance, candidates, initial_fuel=50.0)
-    Note over Opt: Cluster collapsing + Lookahead purchase policy
-    Opt-->>API: FuelPlan (Selected stops, Gallons, Exact Decimal cost)
+    API->>Optimizer: optimize(total_distance, candidates, initial_fuel=50.0)
+    Note over Optimizer: Cluster collapsing + Lookahead purchase policy
+    Optimizer-->>API: FuelPlan (Selected stops, Gallons, Exact Decimal cost)
     API-->>User: HTTP 200 OK (trip_summary, fuel_stops, route_geometry, metadata)
 ```
 
@@ -93,15 +93,15 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    Start(["Start at Origin: Fuel = 50.0 gal, Range = 500 mi, Cost = $0"]) --> CheckDest{"Distance to Finish <= Current Fuel * 10?"}
+    Start(["Start at Origin: Fuel = 50.0 gal, Range = 500 mi, Cost = $0"]) --> CheckDest{"Can Reach Destination with Current Fuel?"}
     CheckDest -- Yes --> Finish(["Reach Destination with Remaining Fuel (Buy 0 gal)"])
-    CheckDest -- No --> FindReachable["Scan Reachable Stations within Range (<= Current Fuel * 10)"]
+    CheckDest -- No --> FindReachable["Scan Reachable Stations within Range (Fuel * 10 mi)"]
     
     FindReachable --> HasReachable{"Any Station Reachable?"}
     HasReachable -- No --> Infeasible["Raise NoFeasibleFuelPlanError (HTTP 422)"]
     
     HasReachable -- Yes --> Lookahead{"Cheaper Station Reachable Ahead?"}
-    Lookahead -- "Yes (P_next < P_curr)" --> BuyMin["Purchase ONLY Enough Fuel to Reach Cheaper Station"]
+    Lookahead -- "Yes (Cheaper Station Ahead)" --> BuyMin["Purchase ONLY Enough Fuel to Reach Cheaper Station"]
     Lookahead -- "No (Current is Local Minimum)" --> FillTank["Purchase Fuel to Maximize Range (Fill to 50 gal or Reach Finish)"]
     
     BuyMin --> MoveToNext["Travel to Next Selected Stop (Consume miles / 10 gal)"]
