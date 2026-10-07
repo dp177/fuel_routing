@@ -1,0 +1,15 @@
+# Core Web & API Framework (Latest Stable)
+django>=6.1.2,<7.0.0
+djangorestframework>=3.18.3,<4.0.0
+drf-spectacular>=0.30.0
+
+# HTTP & Networking
+httpx>=0.28.1
+
+# Geospatial & Mathematics
+shapely>=2.0.0
+numpy>=1.26.0
+
+# Testing
+pytest>=9.1.1
+pytest-django>=4.14.0
