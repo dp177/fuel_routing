@@ -171,7 +171,22 @@ python manage.py load_fuel_stations
 python manage.py runserver
 ```
 
-The service will be accessible at `http://127.0.0.1:8000/`.
+The service will be accessible locally at `http://127.0.0.1:8000/`.
+
+### Deployment on Vercel
+
+The repository includes native zero-configuration serverless support for Vercel with `vercel.json`, WhiteNoise static file compression, and self-contained database handling:
+
+1. **Import Project**: In your [Vercel Dashboard](https://vercel.com/new), select **Add New Project** and import the `dp177/fuel_routing` repository.
+2. **Framework Preset**: Leave as **Other** (Vercel will detect `vercel.json` and `@vercel/python`).
+3. **Root Directory**: `./` (default).
+4. **Environment Variables** (Optional):
+   - `DJANGO_SECRET_KEY`: Set a production secret key (a default is provided if omitted).
+   - `DJANGO_DEBUG`: Set to `False` (automatically defaults to `False` on Vercel).
+5. **Click Deploy**:
+   - The interactive demo will immediately be live at `https://<your-project>.vercel.app/`.
+   - The Swagger OpenAPI documentation will be at `https://<your-project>.vercel.app/api/docs/`.
+   - The REST API will be at `https://<your-project>.vercel.app/api/v1/route/fuel-plan/`.
 
 ---
 

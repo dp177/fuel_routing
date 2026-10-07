@@ -2,6 +2,8 @@
 django>=6.1.2,<7.0.0
 djangorestframework>=3.18.3,<4.0.0
 drf-spectacular>=0.30.0
+whitenoise>=6.8.0
+dj-database-url>=2.1.0
 
 # HTTP & Networking
 httpx>=0.28.1
